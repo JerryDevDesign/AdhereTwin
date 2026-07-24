@@ -39,8 +39,24 @@ export async function POST(req: NextRequest) {
       missedStreak: m.missed_streak,
     }));
 
-    // Execute Ontomorph Simulation Core
-    const simResults = await executeOntomorphSimulation(medications);
+    // Execute Ontomorph Simulation Core with safe fallback mapping
+    let simResults = [];
+    try {
+      simResults = await executeOntomorphSimulation(medications);
+    } catch (simErr) {
+      console.error('Simulation engine warning, using fallback calculation:', simErr);
+      simResults = medications.map((med: any) => {
+        const missed = med.missedStreak || 0;
+        const degradationScore = Math.min(100, Math.round(10 * Math.log(missed + 1) * 10));
+        return {
+          organ: med.organ || 'General',
+          medication: med.name,
+          missedStreak: missed,
+          degradationScore,
+          status: missed > 0 ? 'degraded' : 'optimized'
+        };
+      });
+    }
 
     // Execute Gemini AI Clinical Narrative Core
     const narrative = await generateGeminiClinicalNarrative(patient, simResults, adherenceRate);
