@@ -3,7 +3,14 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
+
 export const dynamic = 'force-dynamic';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!, 
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 function AddPatientContent() {
   const router = useRouter();
@@ -17,9 +24,19 @@ function AddPatientContent() {
   const [meds, setMeds] = useState([{ name: '', diagnosis: '', timesPerDay: 1 }]);
   const [loading, setLoading] = useState(false);
 
+  // States for the patient dropdown selector integration
+  const [patients, setPatients] = useState<any[]>([]);
+  const [selectedPatientId, setSelectedPatientId] = useState('');
+
   useEffect(() => {
     const docId = searchParams.get('doctorId');
     if (docId) setDoctorId(docId);
+
+    async function fetchPatients() {
+      const { data, error } = await supabase.from('patients').select('id, name, diagnosis');
+      if (data) setPatients(data);
+    }
+    fetchPatients();
   }, [searchParams]);
 
   const addMed = () => setMeds(m => [...m, { name: '', diagnosis: '', timesPerDay: 1 }]);
@@ -44,6 +61,13 @@ function AddPatientContent() {
     }
   };
 
+  const handleSelectPatientLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPatientId) return;
+    localStorage.setItem('currentPatientId', selectedPatientId);
+    router.push(`/dashboard?id=${selectedPatientId}`);
+  };
+
   const S = {
     input: { width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '12px 14px', color: '#e2e8f0', fontSize: 15, marginBottom: 12 },
     label: { fontSize: 12, fontWeight: 700, color: '#94a3b8', display: 'block', marginBottom: 6 },
@@ -54,11 +78,41 @@ function AddPatientContent() {
     <main style={{ minHeight: '100vh', background: '#0f172a', color: '#e2e8f0', fontFamily: 'system-ui', padding: '20px 16px', paddingBottom: 60 }}>
       <header style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
         <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: '#60a5fa', fontSize: 16, fontWeight: 700 }}>← Back</button>
-        <div style={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: 18 }}>New Patient</div>
+        <div style={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: 18 }}>New Patient & Quick Access</div>
         <div style={{ width: 50 }}></div>
       </header>
 
       <div style={{ maxWidth: 500, margin: '0 auto' }}>
+        
+        {/* Patient Selector Dropdown Section */}
+        <div style={S.panel as React.CSSProperties}>
+          <form onSubmit={handleSelectPatientLogin}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: '#38bdf8', marginBottom: 12 }}>Access Existing Twin</div>
+            <label style={S.label as React.CSSProperties}>Select Patient</label>
+            <select 
+              value={selectedPatientId} 
+              onChange={(e) => setSelectedPatientId(e.target.value)}
+              style={S.input as React.CSSProperties}
+            >
+              <option value="">-- Choose an existing patient --</option>
+              {patients.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.diagnosis || 'General'})
+                </option>
+              ))}
+            </select>
+            <button 
+              type="submit" 
+              disabled={!selectedPatientId}
+              style={{ width: '100%', background: '#0284c7', color: 'white', border: 'none', borderRadius: 8, padding: '10px 0', fontWeight: 700, fontSize: 14, opacity: !selectedPatientId ? 0.6 : 1, cursor: !selectedPatientId ? 'not-allowed' : 'pointer' }}
+            >
+              Enter App with Selected ID
+            </button>
+          </form>
+        </div>
+
+        <div style={{ textAlign: 'center', color: '#64748b', margin: '16px 0', fontWeight: 600, fontSize: 13 }}>— OR REGISTER NEW PATIENT —</div>
+
         <div style={S.panel as React.CSSProperties}>
           <div style={{ fontWeight: 800, fontSize: 16, color: '#60a5fa', marginBottom: 16 }}>Clinical Details</div>
           
@@ -90,7 +144,7 @@ function AddPatientContent() {
           
           {meds.map((med, i) => (
             <div key={i} style={{ background: '#0f172a', padding: 16, borderRadius: 12, marginBottom: 12, border: '1px solid #334155' }}>
-              <label style={S.label as React.CSSProperties}>Drug Name (Mapped via HOLON)</label>
+              <label style={S.label as React.CSSProperties}>Drug Name</label>
               <input value={med.name} onChange={e => updMed(i, 'name', e.target.value)} placeholder="e.g. Amlodipine" style={S.input as React.CSSProperties} />
               
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
@@ -114,9 +168,9 @@ function AddPatientContent() {
         <button 
           onClick={register} 
           disabled={loading || !name || !doctorId}
-          style={{ width: '100%', background: '#2563eb', color: 'white', border: 'none', borderRadius: 12, padding: '16px 0', fontWeight: 800, fontSize: 16, opacity: loading ? 0.7 : 1 }}
+          style={{ width: '100%', background: '#2563eb', color: 'white', border: 'none', borderRadius: 12, padding: '16px 0', fontWeight: 800, fontSize: 16, opacity: loading || !name || !doctorId ? 0.7 : 1 }}
         >
-          {loading ? 'Provisioning Twin via HOLON...' : 'Register Patient & Generate Twin'}
+          {loading ? 'Provisioning Twin...' : 'Register Patient & Generate Twin'}
         </button>
       </div>
     </main>
