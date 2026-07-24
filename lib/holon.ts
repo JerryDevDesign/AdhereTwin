@@ -52,14 +52,23 @@ export async function enrichDrugWithHOLON(
 ): Promise<{ organ: string; interactions: string[] }> {
   try {
     const results = await dtp.holon.concepts.search(drugName);
+ export async function enrichDrugWithHOLON(
+  drugName: string,
+  dtp: DTP
+): Promise<{ organ: string; interactions: string[] }> {
+  try {
+    const results = await dtp.holon.concepts.search(drugName);
     if (!results?.hits?.length) {
       return { organ: getOrganForDrug(drugName), interactions: [] };
     }
-    const concept = results.hits[0];
+    
+    // Cast as any to satisfy TypeScript strict checking
+    const concept: any = results.hits[0];
     const organ = concept.bodySystems?.[0] || getOrganForDrug(drugName);
     const interactions = (concept.drugInteractions || [])
       .slice(0, 3)
       .map((d: any) => d.label || d);
+      
     return { organ, interactions };
   } catch {
     return { organ: getOrganForDrug(drugName), interactions: [] };
