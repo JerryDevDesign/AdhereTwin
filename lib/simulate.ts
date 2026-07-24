@@ -35,7 +35,7 @@ export async function runConsequenceSimulation(
     );
 
     try {
-      await dtp.simulation.run({
+      await (dtp as any).simulation.run({
         system:    med.organ,
         scenario:  `medication_nonadherence`,
         parameters: {
