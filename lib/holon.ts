@@ -1,7 +1,6 @@
 // lib/holon.ts
 import { DTP } from '@ontomorph/dtp-sdk';
 
-// Maps common medications to the organ systems they protect
 const DRUG_ORGAN_MAP: Record<string, string> = {
   amlodipine:    'Heart', lisinopril:   'Heart', atenolol:    'Heart',
   metoprolol:    'Heart', ramipril:     'Heart', losartan:    'Heart',
@@ -16,7 +15,6 @@ const DRUG_ORGAN_MAP: Record<string, string> = {
   cotrimoxazole: 'Immune System', artemether: 'Blood',
 };
 
-// Consequence descriptions per organ when medication is missed
 const CONSEQUENCE_MAP: Record<string, { short: string; risk: string; colour: string }> = {
   'Heart':                   { short: 'BP rising, cardiac stress increasing', risk: 'Stroke / Heart attack', colour: '#ef4444' },
   'Blood':                   { short: 'Crisis risk increasing', risk: 'Vaso-occlusive crisis / Anaemia', colour: '#f97316' },
@@ -52,23 +50,14 @@ export async function enrichDrugWithHOLON(
 ): Promise<{ organ: string; interactions: string[] }> {
   try {
     const results = await dtp.holon.concepts.search(drugName);
- export async function enrichDrugWithHOLON(
-  drugName: string,
-  dtp: DTP
-): Promise<{ organ: string; interactions: string[] }> {
-  try {
-    const results = await dtp.holon.concepts.search(drugName);
     if (!results?.hits?.length) {
       return { organ: getOrganForDrug(drugName), interactions: [] };
     }
-    
-    // Cast as any to satisfy TypeScript strict checking
     const concept: any = results.hits[0];
     const organ = concept.bodySystems?.[0] || getOrganForDrug(drugName);
     const interactions = (concept.drugInteractions || [])
       .slice(0, 3)
       .map((d: any) => d.label || d);
-      
     return { organ, interactions };
   } catch {
     return { organ: getOrganForDrug(drugName), interactions: [] };
