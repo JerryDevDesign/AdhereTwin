@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       simResults = await runConsequenceSimulation(medications, dtp);
     } catch (dtpErr) {
       console.error('Ontomorph SDK simulation warning (using fallback calculation):', dtpErr);
-      simResults = medications.map(med => {
+      simResults = medications.map((med: any) => {
         const missed = med.missedStreak || 0;
         const degradationScore = Math.min(100, Math.round(10 * Math.log(missed + 1) * 10));
         return {
