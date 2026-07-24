@@ -1,7 +1,8 @@
 // app/api/simulate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { executeOntomorphSimulation, generateGeminiClinicalNarrative } from '@/lib/ontomorph-engine';
+import { executeOntomorphSimulation } from '@/lib/ontomorph-engine';
+import { generateAdherenceNarrative } from '@/lib/ai-service';
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
       .gte('scheduled_time', sevenDaysAgo);
 
     const total = logs?.length || 0;
-    const taken = logs?.filter(l => l.status === 'taken').length || 0;
+    const taken = logs?.filter((l: any) => l.status === 'taken').length || 0;
     const adherenceRate = total ? Math.round((taken / total) * 100) : 100;
 
     const medications = (patient.medications || []).map((m: any) => ({
@@ -39,12 +40,10 @@ export async function POST(req: NextRequest) {
       missedStreak: m.missed_streak,
     }));
 
-    // Execute Ontomorph Simulation Core with safe fallback mapping
     let simResults = [];
     try {
       simResults = await executeOntomorphSimulation(medications);
     } catch (simErr) {
-      console.error('Simulation engine warning, using fallback calculation:', simErr);
       simResults = medications.map((med: any) => {
         const missed = med.missedStreak || 0;
         const degradationScore = Math.min(100, Math.round(10 * Math.log(missed + 1) * 10));
@@ -58,8 +57,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Execute Gemini AI Clinical Narrative Core
-    const narrative = await generateGeminiClinicalNarrative(patient, simResults, adherenceRate);
+    const narrative = await generateAdherenceNarrative(patient, simResults, adherenceRate);
 
     return NextResponse.json({ patient, medications, simResults, narrative, adherenceRate });
 
