@@ -1,9 +1,7 @@
 // app/api/simulate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { DTP } from '@ontomorph/dtp-sdk';
-import { runConsequenceSimulation } from '@/lib/simulate';
-import { generateAdherenceNarrative } from '@/lib/gemini';
+import { executeOntomorphSimulation, generateGeminiClinicalNarrative } from '@/lib/ontomorph-engine';
 
 export async function POST(req: NextRequest) {
   try {
@@ -41,48 +39,11 @@ export async function POST(req: NextRequest) {
       missedStreak: m.missed_streak,
     }));
 
-    // Initialize Ontomorph DTP SDK safely
-    let simResults = [];
-    try {
-      const dtp = new DTP({
-        apiKey: process.env.DTP_API_KEY!,
-        holonApiUrl: process.env.HOLON_API_URL!,
-        holonApiKey: process.env.HOLON_API_KEY!,
-      });
-      simResults = await runConsequenceSimulation(medications, dtp);
-    } catch (dtpErr) {
-      console.error('Ontomorph SDK simulation warning (using fallback calculation):', dtpErr);
-      simResults = medications.map((med: any) => {
-        const missed = med.missedStreak || 0;
-        const degradationScore = Math.min(100, Math.round(10 * Math.log(missed + 1) * 10));
-        return {
-          organ: med.organ || 'General',
-          medication: med.name,
-          missedStreak: missed,
-          degradationScore,
-          status: missed > 0 ? 'degraded' : 'optimized'
-        };
-      });
-    }
+    // Execute Ontomorph Simulation Core
+    const simResults = await executeOntomorphSimulation(medications);
 
-    // Generate Gemini Narrative safely with fallback
-    let narrative;
-    try {
-      narrative = await generateAdherenceNarrative(
-        { ...patient, medications, isChild: patient.is_child },
-        simResults,
-        adherenceRate
-      );
-    } catch (geminiErr) {
-      console.error('Gemini narrative generation warning (using fallback narrative):', geminiErr);
-      narrative = {
-        headline: adherenceRate === 100 ? 'System Fully Optimized' : 'Biometric Vulnerability Detected',
-        bodyText: adherenceRate === 100 
-          ? 'All organ pathways are operating under full pharmacological protection.' 
-          : 'Missed doses have introduced localized physiological stress. Immediate correction advised.',
-        callToAction: adherenceRate === 100 ? 'Maintain current schedule' : 'Take pending dose immediately'
-      };
-    }
+    // Execute Gemini AI Clinical Narrative Core
+    const narrative = await generateGeminiClinicalNarrative(patient, simResults, adherenceRate);
 
     return NextResponse.json({ patient, medications, simResults, narrative, adherenceRate });
 

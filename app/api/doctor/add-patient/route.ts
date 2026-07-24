@@ -1,51 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { enrichDrugWithHOLON } from '@/lib/holon';
-import { DTP } from '@ontomorph/dtp-sdk';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(req: NextRequest) {
   try {
-    const { doctorId, name, age, isChild, diagnosis, medications } = await req.json();
+    const { name, age, diagnosis, isChild } = await req.json();
 
-    const dtp = new DTP({
-      apiKey:      process.env.DTP_API_KEY!,
-      holonApiUrl: process.env.HOLON_API_URL!,
-      holonApiKey: process.env.HOLON_API_KEY!,
-    });
+    // Fetch default doctor or create relationship if needed
+    const { data: doctor } = await supabaseAdmin.from('doctors').select('id').limit(1).single();
 
-    // 1. Create patient record
-    const { data: patient, error: patientError } = await supabase
-      .from('patients')
-      .insert({ doctor_id: doctorId, name, age, is_child: isChild, diagnosis })
-      .select()
-      .single();
+    const { data, error } = await supabaseAdmin.from('patients').insert([
+      {
+        name,
+        age,
+        diagnosis,
+        is_child: isChild || false,
+        doctor_id: doctor?.id || null
+      }
+    ]).select().single();
 
-    if (patientError) throw patientError;
-
-    // 2. Enrich medications with HOLON and insert
-    const enrichedMeds = await Promise.all(
-      medications.map(async (m: any) => {
-        const { organ } = await enrichDrugWithHOLON(m.name, dtp);
-        return {
-          patient_id:    patient.id,
-          name:          m.name,
-          diagnosis:     m.diagnosis || diagnosis,
-          organ,
-          times_per_day: m.timesPerDay || 1,
-          dose_times:    m.doseTimes || ['08:00'],
-        };
-      })
-    );
-
-    const { data: meds, error: medsError } = await supabase
-      .from('medications')
-      .insert(enrichedMeds)
-      .select();
-
-    if (medsError) throw medsError;
-
-    return NextResponse.json({ patient: { ...patient, medications: meds } });
-
+    if (error) throw error;
+    return NextResponse.json({ success: true, patient: data });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
