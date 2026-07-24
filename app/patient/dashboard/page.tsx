@@ -33,6 +33,31 @@ export default function PatientDashboard() {
     setLogging(null);
   };
 
+  const handleLogDose = async (medicationId: string, organ: string, status: 'taken' | 'missed') => {
+    try {
+      const res = await fetch('/api/patient/dose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId: patientId || localStorage.getItem('currentPatientId') || '',
+          medicationId,
+          status,
+          organ
+        }),
+      });
+
+      const resData = await res.json();
+      if (resData.success) {
+        alert(`Dose recorded as ${status}!`);
+        await load(patientId || localStorage.getItem('currentPatientId') || '');
+      } else {
+        alert(`Error: ${resData.error}`);
+      }
+    } catch (err) {
+      console.error('Failed to log dose:', err);
+    }
+  };
+
   const affectedOrgans = data?.simResults?.reduce((acc: any, r: any) => {
     acc[r.organ] = r; return acc;
   }, {}) || {};
@@ -75,16 +100,22 @@ export default function PatientDashboard() {
 
       <div style={{ padding: '0 16px' }}>
         
-        {data.narrative && (
-          <div style={{ background: '#1a2744', borderRadius: 16, padding: 20, border: '1px solid #2563eb', position: 'relative', zIndex: 10, marginTop: 10, marginBottom: 20, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)' }}>
-            <div style={{ fontWeight: 800, fontSize: 16, color: '#60a5fa', marginBottom: 8 }}>
-              {data.narrative.headline}
+        {data.adherenceRate === 100 ? (
+          <div style={{ background: '#065f46', borderRadius: 16, padding: 20, border: '1px solid #059669', position: 'relative', zIndex: 10, marginTop: 10, marginBottom: 20, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: '#34d399', marginBottom: 8 }}>
+              Fantastic job! 100% Adherence 🎉
             </div>
-            <div style={{ fontSize: 13, color: '#cbd5e1', lineHeight: 1.6, marginBottom: 12 }}>
-              {data.narrative.bodyText}
+            <div style={{ fontSize: 13, color: '#a7f3d0', lineHeight: 1.6, marginBottom: 12 }}>
+              You have maintained complete adherence to your care plan. Your digital twin is fully optimized and your body is receiving maximum protection.
             </div>
-            <div style={{ background: '#2563eb', borderRadius: 8, padding: '10px 14px', fontSize: 14, color: 'white', fontWeight: 700 }}>
-              {data.narrative.callToAction}
+          </div>
+        ) : (
+          <div style={{ background: '#2d1a1a', borderRadius: 16, padding: 20, border: '1px solid #ef4444', position: 'relative', zIndex: 10, marginTop: 10, marginBottom: 20, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.3)' }}>
+            <div style={{ fontWeight: 800, fontSize: 16, color: '#f87171', marginBottom: 8 }}>
+              Your {data.adherenceRate}% adherence rate needs attention
+            </div>
+            <div style={{ fontSize: 13, color: '#fca5a5', lineHeight: 1.6, marginBottom: 12 }}>
+              Missing doses allows your condition to progress without protection. Take your next scheduled dose now.
             </div>
           </div>
         )}
@@ -92,7 +123,6 @@ export default function PatientDashboard() {
         <div style={S.panel as React.CSSProperties}>
           <div style={{ fontWeight: 800, fontSize: 15, color: '#94a3b8', marginBottom: 16, textAlign: 'center' }}>Your Digital Twin</div>
           
-          {/* THE NEW COMPONENT IS HERE */}
           <BodyMap affectedOrgans={affectedOrgans} />
           
         </div>
@@ -122,6 +152,22 @@ export default function PatientDashboard() {
                     ✗ Missed
                   </button>
                 </div>
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button 
+                    onClick={() => handleLogDose(med.id, med.organ, 'taken')}
+                    style={{ background: '#059669', color: 'white', padding: '8px 16px', borderRadius: 8, border: 'none', fontWeight: 700, cursor: 'pointer', flex: 1 }}
+                  >
+                    Take Dose ✓
+                  </button>
+                  <button 
+                    onClick={() => handleLogDose(med.id, med.organ, 'missed')}
+                    style={{ background: '#dc2626', color: 'white', padding: '8px 16px', borderRadius: 8, border: 'none', fontWeight: 700, cursor: 'pointer', flex: 1 }}
+                  >
+                    Missed ✕
+                  </button>
+                </div>
+
               </div>
             );
           })}
