@@ -1,9 +1,11 @@
 // app/doctor/add-patient/page.tsx
+export const dynamic = 'force-dynamic';
+
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function AddPatient() {
+function AddPatientContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -118,5 +120,13 @@ export default function AddPatient() {
         </button>
       </div>
     </main>
+  );
+}
+
+export default function AddPatient() {
+  return (
+    <Suspense fallback={<div style={{ background: '#0f172a', color: '#e2e8f0', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading...</div>}>
+      <AddPatientContent />
+    </Suspense>
   );
 }
